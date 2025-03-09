@@ -2,7 +2,6 @@ mod routes;
 
 #[cfg(test)]
 pub(crate) mod test_utils {
-    
     use axum_test::TestServer;
     use fchain::blockchain::create_shared_blockchain;
     use fchain::blockchain::SharedBlockchain;
