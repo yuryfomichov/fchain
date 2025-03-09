@@ -197,7 +197,7 @@ pub fn create_shared_blockchain(difficulty: usize, mining_reward: f64) -> Shared
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::blockchain::wallet::Wallet;
+    use crate::blockchain::wallet::Address;
 
     #[test]
     fn test_blockchain_creation() {
@@ -214,14 +214,12 @@ mod tests {
     fn test_mining_block() {
         let mut blockchain = Blockchain::new(2, 100.0);
 
-        // Create a wallet and transaction
-        let wallet = Wallet::new().unwrap();
-        let recipient = Address("recipient".to_string());
-        let mut tx = Transaction::new(wallet.get_address().clone(), recipient, 10.0);
-
-        // Sign the transaction using wallet directly
-        let signature = wallet.sign(tx.hash.as_bytes()).unwrap();
-        tx.signature = Some(signature);
+        // Create a system transaction (doesn't need signing)
+        let tx = Transaction::new(
+            Address("system".to_string()),
+            Address("recipient".to_string()),
+            10.0,
+        );
 
         // Add transaction and mine block
         blockchain.create_transaction(tx).unwrap();

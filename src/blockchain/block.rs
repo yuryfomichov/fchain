@@ -1,9 +1,9 @@
-use super::transaction::Transaction;
-use super::wallet::Address;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use utoipa::ToSchema;
+
+use super::transaction::Transaction;
 
 /// Represents a block in the blockchain
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -103,6 +103,7 @@ impl Block {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::blockchain::Address;
 
     #[test]
     fn test_genesis_block() {
