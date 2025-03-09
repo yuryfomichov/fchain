@@ -32,7 +32,11 @@ pub struct Blockchain {
 impl Blockchain {
     /// Creates a new blockchain with the genesis block
     pub fn new(difficulty: usize, mining_reward: f64) -> Self {
-        let chain = vec![Block::genesis()];
+        // Create genesis block with the specified difficulty
+        let mut genesis = Block::genesis();
+        genesis.difficulty = difficulty;
+
+        let chain = vec![genesis];
 
         Self {
             chain,
@@ -89,6 +93,13 @@ impl Blockchain {
         // Mine the block
         new_block.mine(self.difficulty);
 
+        // Validate the new block against the latest block
+        if !new_block.is_valid_next_block(latest_block) {
+            return Err(BlockchainError::InvalidBlock(
+                "Newly mined block is invalid".to_string(),
+            ));
+        }
+
         // Add the block to the chain
         self.chain.push(new_block.clone());
 
@@ -107,43 +118,31 @@ impl Blockchain {
             ));
         }
 
-        // Iterate through the chain and validate each block
+        // Validate the genesis block
+        let genesis = &self.chain[0];
+        if genesis.index != 0 || !genesis.is_valid() {
+            return Err(BlockchainError::InvalidBlock(
+                "Genesis block is invalid".to_string(),
+            ));
+        }
+
+        // Iterate through the chain and validate each block against its predecessor
         for i in 1..self.chain.len() {
             let current_block = &self.chain[i];
             let previous_block = &self.chain[i - 1];
 
-            // Check if the block is valid
-            if !current_block.is_valid() {
+            // Use the improved is_valid_next_block method which includes:
+            // - Index validation
+            // - Previous hash validation
+            // - Hash integrity validation
+            // - Proof of work validation
+            // - Timestamp validation
+            // - Transaction validation
+            if !current_block.is_valid_next_block(previous_block) {
                 return Err(BlockchainError::InvalidBlock(format!(
-                    "Block {} has invalid hash",
+                    "Block {} is invalid relative to its predecessor",
                     current_block.index
                 )));
-            }
-
-            // Check if the previous hash matches
-            if current_block.previous_hash != previous_block.hash {
-                return Err(BlockchainError::ValidationFailed(format!(
-                    "Block {} has invalid previous hash reference",
-                    current_block.index
-                )));
-            }
-
-            // Check if the index is sequential
-            if current_block.index != previous_block.index + 1 {
-                return Err(BlockchainError::ValidationFailed(format!(
-                    "Block {} has invalid index",
-                    current_block.index
-                )));
-            }
-
-            // Validate all transactions in the block
-            for transaction in &current_block.transactions {
-                if !transaction.is_valid() {
-                    return Err(BlockchainError::InvalidTransaction(format!(
-                        "Invalid transaction in block {}",
-                        current_block.index
-                    )));
-                }
             }
         }
 
@@ -208,6 +207,7 @@ mod tests {
         assert!(blockchain.pending_transactions.is_empty());
         assert_eq!(blockchain.difficulty, 2);
         assert_eq!(blockchain.mining_reward, 100.0);
+        assert_eq!(blockchain.chain[0].difficulty, 2); // Genesis block should have the same difficulty
     }
 
     #[test]
