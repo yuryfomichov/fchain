@@ -59,6 +59,27 @@ impl PublicKeyHex {
 
         Ok(Address(address))
     }
+
+    /// Verifies a signature against a message using this public key
+    pub fn verify_signature(
+        &self,
+        message: &[u8],
+        signature: &TransactionSignature,
+    ) -> Result<bool, CryptoError> {
+        let ed25519_public_key = self.to_ed25519_public_key()?;
+        let ed25519_signature = signature.to_ed25519_signature()?;
+
+        match ed25519_public_key.verify_strict(message, &ed25519_signature) {
+            Ok(_) => Ok(true),
+            Err(_) => Ok(false),
+        }
+    }
+
+    /// Verifies that an address was derived from this public key
+    pub fn verify_address(&self, address: &Address) -> Result<bool, CryptoError> {
+        let derived_address = self.to_address()?;
+        Ok(derived_address.0 == address.0)
+    }
 }
 
 /// Represents a digital signature for a transaction
@@ -76,25 +97,4 @@ impl TransactionSignature {
 
         Ok(signature)
     }
-}
-
-/// Verifies a signature against a message using the provided public key
-pub fn verify_signature(
-    public_key: &PublicKeyHex,
-    message: &[u8],
-    signature: &TransactionSignature,
-) -> Result<bool, CryptoError> {
-    let ed25519_public_key = public_key.to_ed25519_public_key()?;
-    let ed25519_signature = signature.to_ed25519_signature()?;
-
-    match ed25519_public_key.verify_strict(message, &ed25519_signature) {
-        Ok(_) => Ok(true),
-        Err(_) => Ok(false),
-    }
-}
-
-/// Verifies that an address was derived from the given public key
-pub fn verify_address(public_key: &PublicKeyHex, address: &Address) -> Result<bool, CryptoError> {
-    let derived_address = public_key.to_address()?;
-    Ok(derived_address.0 == address.0)
 }

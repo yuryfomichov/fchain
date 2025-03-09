@@ -3,9 +3,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use utoipa::ToSchema;
 
-use super::crypto::{
-    verify_address, verify_signature, Address, PublicKeyHex, TransactionSignature,
-};
+use super::crypto::{Address, PublicKeyHex, TransactionSignature};
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Transaction {
@@ -107,7 +105,7 @@ impl Transaction {
         };
 
         // Verify that the address was derived from the public key
-        let address_valid = match verify_address(public_key, &self.sender) {
+        let address_valid = match public_key.verify_address(&self.sender) {
             Ok(valid) => valid,
             Err(e) => {
                 println!("Transaction invalid: address verification error: {}", e);
@@ -121,7 +119,7 @@ impl Transaction {
         }
 
         // Verify the signature
-        let result = verify_signature(public_key, self.hash.as_bytes(), signature);
+        let result = public_key.verify_signature(self.hash.as_bytes(), signature);
         match result {
             Ok(valid) => {
                 if !valid {
