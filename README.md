@@ -1,8 +1,6 @@
 # FChain - A Simple Blockchain in Rust
 
-![Rust CI](https://github.com/YOUR_USERNAME/fchain/workflows/Rust%20CI/badge.svg)
-
-> **Note:** After forking this repository, replace `YOUR_USERNAME` in the badge URL with your GitHub username.
+![Rust CI](https://github.com/yuryfomichov/fchain/workflows/Rust%20CI/badge.svg)
 
 This project implements a basic blockchain with the following features:
 - Core blockchain data structures (Block, Transaction, Blockchain)
