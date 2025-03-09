@@ -1,5 +1,9 @@
 # FChain - A Simple Blockchain in Rust
 
+![Rust CI](https://github.com/YOUR_USERNAME/fchain/workflows/Rust%20CI/badge.svg)
+
+> **Note:** After forking this repository, replace `YOUR_USERNAME` in the badge URL with your GitHub username.
+
 This project implements a basic blockchain with the following features:
 - Core blockchain data structures (Block, Transaction, Blockchain)
 - Proof of Work consensus mechanism
@@ -38,6 +42,18 @@ RUST_LOG=info cargo run
 # Run tests
 cargo test
 ```
+
+## Continuous Integration
+
+This project uses GitHub Actions for continuous integration. The CI pipeline automatically runs on every push to the main branch and on pull requests.
+
+The CI pipeline performs the following checks:
+- Code formatting (rustfmt)
+- Linting (clippy)
+- Building the project
+- Running all tests
+
+You can see the status of the CI pipeline in the GitHub repository under the "Actions" tab.
 
 ## Accessing the Application
 
