@@ -1,4 +1,4 @@
-use axum_test::TestResponse;
+use fchain::blockchain::wallet::Wallet;
 use fchain::blockchain::Transaction;
 use http::StatusCode;
 use serde_json::{json, Value};
@@ -31,10 +31,13 @@ async fn test_get_blocks() {
 async fn test_create_transaction() {
     // Arrange
     let server = create_test_server().await;
+
+    // Use a system transaction which doesn't require a signature
     let tx_data = json!({
-        "sender": "test_sender",
-        "recipient": "test_recipient",
-        "amount": 10.0
+        "sender": "system",
+        "recipient": "recipient",
+        "amount": 10.0,
+        "signature": null
     });
 
     // Act
@@ -45,15 +48,59 @@ async fn test_create_transaction() {
 
     let body: Value = response.json();
     assert_eq!(body["message"], "Transaction created successfully");
-    assert_eq!(body["transaction"]["sender"], "test_sender");
-    assert_eq!(body["transaction"]["recipient"], "test_recipient");
-    assert_eq!(body["transaction"]["amount"], 10.0);
+
+    // Check the transaction fields
+    let tx = &body["transaction"];
+    assert_eq!(tx["sender"], "system");
+    assert_eq!(tx["recipient"], "recipient");
+    assert_eq!(tx["amount"], 10.0);
 
     // Verify transaction was added to pending
     let pending_response = server.get("/transactions/pending").await;
     let pending: Vec<Value> = pending_response.json();
     assert_eq!(pending.len(), 1);
-    assert_eq!(pending[0]["sender"], "test_sender");
+    assert_eq!(pending[0]["sender"], "system");
+}
+
+#[tokio::test]
+async fn test_create_signed_transaction() {
+    // Arrange
+    let server = create_test_server().await;
+    let wallet = Wallet::new().unwrap();
+
+    // Create a transaction with the exact same parameters as we'll send to the API
+    let mut tx = Transaction::new(
+        wallet.get_address().clone(),
+        wallet.get_address().clone(), // Send to self for testing
+        10.0,
+    );
+
+    // Sign the transaction
+    tx.sign(&wallet).unwrap();
+
+    // Create the API request with the SAME parameters
+    let tx_data = json!({
+        "sender": wallet.get_address().0,
+        "recipient": wallet.get_address().0, // Must match what we signed
+        "amount": 10.0,
+        "signature": tx.signature.as_ref().map(|s| s.0.clone())
+    });
+
+    // Act
+    let response = server.post("/transactions").json(&tx_data).await;
+
+    // Assert
+    response.assert_status(StatusCode::OK);
+
+    let body: Value = response.json();
+    assert_eq!(body["message"], "Transaction created successfully");
+
+    // Check the transaction fields
+    let tx_response = &body["transaction"];
+    assert_eq!(tx_response["sender"], wallet.get_address().0);
+    assert_eq!(tx_response["recipient"], wallet.get_address().0);
+    assert_eq!(tx_response["amount"], 10.0);
+    assert!(tx_response["signature"].is_object() || tx_response["signature"].is_string());
 }
 
 #[tokio::test]
@@ -61,11 +108,12 @@ async fn test_mine_block() {
     // Arrange
     let server = create_test_server().await;
 
-    // Add a transaction first
+    // Use a system transaction which doesn't require a signature
     let tx_data = json!({
-        "sender": "test_sender",
-        "recipient": "test_recipient",
-        "amount": 10.0
+        "sender": "system",
+        "recipient": "recipient",
+        "amount": 10.0,
+        "signature": null
     });
     server.post("/transactions").json(&tx_data).await;
 
@@ -126,25 +174,21 @@ async fn test_get_pending_transactions_empty() {
 
 #[tokio::test]
 async fn test_invalid_transaction() {
-    // This test is a bit artificial since our current implementation doesn't actually
-    // validate transactions properly, but it demonstrates error handling
-
     // Arrange
     let server = create_test_server().await;
     let tx_data = json!({
         "sender": "",  // Empty sender should be invalid
         "recipient": "test_recipient",
-        "amount": -10.0  // Negative amount should be invalid
+        "amount": -10.0,  // Negative amount should be invalid
+        "signature": null
     });
 
     // Act
     let response = server.post("/transactions").json(&tx_data).await;
 
-    // We're not asserting the status code here because our current implementation
-    // doesn't actually validate these conditions. In a real implementation, this
-    // should return a 400 Bad Request.
+    // Assert
+    response.assert_status(StatusCode::BAD_REQUEST);
 
-    // Instead, we're just making sure the API doesn't crash
-    let status = response.status_code();
-    assert!(status.is_success() || status.is_client_error());
+    let body: Value = response.json();
+    assert!(body["error"].as_str().unwrap().contains("not valid"));
 }

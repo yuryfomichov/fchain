@@ -5,7 +5,9 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::blockchain::{Block, BlockchainError, SharedBlockchain, Transaction};
+use crate::blockchain::{
+    Address, Block, BlockchainError, SharedBlockchain, Transaction, TransactionSignature,
+};
 
 /// Error response for the API
 #[derive(Debug, Serialize)]
@@ -31,6 +33,7 @@ pub struct CreateTransactionRequest {
     pub sender: String,
     pub recipient: String,
     pub amount: f64,
+    pub signature: Option<String>,
 }
 
 /// Response for a successful transaction creation
@@ -71,7 +74,26 @@ pub async fn create_transaction(
     State(blockchain): State<SharedBlockchain>,
     Json(request): Json<CreateTransactionRequest>,
 ) -> Result<Json<CreateTransactionResponse>, BlockchainError> {
-    let transaction = Transaction::new(request.sender, request.recipient, request.amount);
+    let mut transaction = Transaction::new(
+        Address(request.sender.clone()),
+        Address(request.recipient),
+        request.amount,
+    );
+
+    // If it's a system transaction (mining reward), it doesn't need a signature
+    if request.sender != "system" {
+        // For non-system transactions, a signature is required for validation
+        if let Some(signature_str) = request.signature {
+            transaction.signature = Some(TransactionSignature(signature_str));
+        }
+    }
+
+    // Validate the transaction
+    if !transaction.is_valid() {
+        return Err(BlockchainError::InvalidTransaction(
+            "Transaction is not valid".to_string(),
+        ));
+    }
 
     let mut blockchain = blockchain.lock().unwrap();
     blockchain.create_transaction(transaction.clone())?;

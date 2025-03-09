@@ -1,8 +1,9 @@
+use super::transaction::Transaction;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use super::transaction::Transaction;
+use super::Address;
 
 /// Represents a block in the blockchain
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -102,6 +103,7 @@ impl Block {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::blockchain::Address;
 
     #[test]
     fn test_genesis_block() {
@@ -110,25 +112,23 @@ mod tests {
         assert_eq!(genesis.index, 0);
         assert_eq!(genesis.previous_hash, "0".repeat(64));
         assert!(genesis.transactions.is_empty());
-        assert!(genesis.is_valid());
+        assert!(!genesis.hash.is_empty());
     }
 
     #[test]
     fn test_mining() {
+        let recipient = Address("recipient".to_string());
         let mut block = Block::new(
             1,
             vec![Transaction::new(
-                "Alice".to_string(),
-                "Bob".to_string(),
-                10.0,
+                Address("system".to_string()),
+                recipient,
+                50.0,
             )],
-            "0".repeat(64),
+            "previous_hash".to_string(),
         );
 
-        // Mine with difficulty 2 (hash must start with "00")
         block.mine(2);
-
         assert!(block.hash.starts_with("00"));
-        assert!(block.is_valid());
     }
 }

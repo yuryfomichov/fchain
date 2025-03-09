@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
-use super::{block::Block, transaction::Transaction};
+use super::{block::Block, transaction::Transaction, wallet::Address};
 
 /// Errors that can occur in the blockchain
 #[derive(Debug, Error)]
@@ -51,7 +51,7 @@ impl Blockchain {
     pub fn create_transaction(&mut self, transaction: Transaction) -> Result<(), BlockchainError> {
         if !transaction.is_valid() {
             return Err(BlockchainError::InvalidTransaction(
-                "Transaction hash is invalid".to_string(),
+                "Transaction is not valid".to_string(),
             ));
         }
 
@@ -66,8 +66,8 @@ impl Blockchain {
     ) -> Result<Block, BlockchainError> {
         // Create a mining reward transaction
         let reward_tx = Transaction::new(
-            "System".to_string(),
-            miner_address.to_string(),
+            Address("system".to_string()),
+            Address(miner_address.to_string()),
             self.mining_reward,
         );
 
@@ -135,6 +135,16 @@ impl Blockchain {
                     current_block.index
                 )));
             }
+
+            // Validate all transactions in the block
+            for transaction in &current_block.transactions {
+                if !transaction.is_valid() {
+                    return Err(BlockchainError::InvalidTransaction(format!(
+                        "Invalid transaction in block {}",
+                        current_block.index
+                    )));
+                }
+            }
         }
 
         Ok(true)
@@ -152,6 +162,7 @@ pub fn create_shared_blockchain(difficulty: usize, mining_reward: f64) -> Shared
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::blockchain::wallet::Wallet;
 
     #[test]
     fn test_blockchain_creation() {
@@ -168,12 +179,15 @@ mod tests {
     fn test_mining_block() {
         let mut blockchain = Blockchain::new(2, 100.0);
 
-        // Add a transaction
-        let tx = Transaction::new("Alice".to_string(), "Bob".to_string(), 10.0);
-        blockchain.create_transaction(tx).unwrap();
+        // Create a wallet and transaction
+        let wallet = Wallet::new().unwrap();
+        let recipient = Address("recipient".to_string());
+        let mut tx = Transaction::new(wallet.get_address().clone(), recipient, 10.0);
+        tx.sign(&wallet).unwrap();
 
-        // Mine a block
-        let block = blockchain.mine_pending_transactions("Miner").unwrap();
+        // Add transaction and mine block
+        blockchain.create_transaction(tx).unwrap();
+        let block = blockchain.mine_pending_transactions("miner").unwrap();
 
         // Check if the block was added to the chain
         assert_eq!(blockchain.chain.len(), 2);
