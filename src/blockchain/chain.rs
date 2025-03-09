@@ -33,8 +33,7 @@ impl Blockchain {
     /// Creates a new blockchain with the genesis block
     pub fn new(difficulty: usize, mining_reward: f64) -> Self {
         // Create genesis block with the specified difficulty
-        let mut genesis = Block::genesis();
-        genesis.difficulty = difficulty;
+        let genesis = Block::genesis(difficulty);
 
         let chain = vec![genesis];
 
@@ -83,15 +82,16 @@ impl Blockchain {
             .get_latest_block()
             .ok_or_else(|| BlockchainError::ValidationFailed("Chain is empty".to_string()))?;
 
-        // Create a new block with pending transactions
+        // Create a new block with pending transactions and the current difficulty
         let mut new_block = Block::new(
             latest_block.index + 1,
             self.pending_transactions.clone(),
             latest_block.hash.clone(),
+            self.difficulty,
         );
 
-        // Mine the block
-        new_block.mine(self.difficulty);
+        // Mine the block using its difficulty setting
+        new_block.mine();
 
         // Validate the new block against the latest block
         if !new_block.is_valid_next_block(latest_block) {
@@ -229,6 +229,7 @@ mod tests {
         assert_eq!(blockchain.chain.len(), 2);
         assert_eq!(block.index, 1);
         assert!(block.hash.starts_with("00"));
+        assert_eq!(block.difficulty, 2); // Block should have the chain's difficulty
 
         // Check if pending transactions were cleared
         assert!(blockchain.pending_transactions.is_empty());

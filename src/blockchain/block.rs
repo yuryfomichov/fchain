@@ -26,7 +26,12 @@ pub struct Block {
 
 impl Block {
     /// Creates a new block
-    pub fn new(index: u64, transactions: Vec<Transaction>, previous_hash: String) -> Self {
+    pub fn new(
+        index: u64,
+        transactions: Vec<Transaction>,
+        previous_hash: String,
+        difficulty: usize,
+    ) -> Self {
         let mut block = Self {
             index,
             timestamp: Utc::now(),
@@ -34,7 +39,7 @@ impl Block {
             previous_hash,
             nonce: 0,
             hash: String::new(),
-            difficulty: 4,
+            difficulty,
         };
 
         block.hash = block.calculate_hash();
@@ -42,7 +47,7 @@ impl Block {
     }
 
     /// Creates the genesis block (first block in the chain)
-    pub fn genesis() -> Self {
+    pub fn genesis(difficulty: usize) -> Self {
         let mut block = Self {
             index: 0,
             timestamp: Utc::now(),
@@ -50,7 +55,7 @@ impl Block {
             previous_hash: "0".repeat(64),
             nonce: 0,
             hash: String::new(),
-            difficulty: 4,
+            difficulty,
         };
 
         block.hash = block.calculate_hash();
@@ -62,8 +67,8 @@ impl Block {
         let mut hasher = Sha256::new();
 
         // Add block data to hasher in a more efficient way
-        hasher.update(&self.index.to_be_bytes());
-        hasher.update(&self.timestamp.timestamp().to_be_bytes());
+        hasher.update(self.index.to_be_bytes());
+        hasher.update(self.timestamp.timestamp().to_be_bytes());
 
         // Process transactions more efficiently
         for tx in &self.transactions {
@@ -71,18 +76,15 @@ impl Block {
         }
 
         hasher.update(self.previous_hash.as_bytes());
-        hasher.update(&self.nonce.to_be_bytes());
+        hasher.update(self.nonce.to_be_bytes());
 
         hex::encode(hasher.finalize())
     }
 
-    /// Mines the block with a specific difficulty
+    /// Mines the block using the block's difficulty setting
     /// The difficulty determines how many leading zeros the hash must have
-    pub fn mine(&mut self, difficulty: usize) {
-        // Store the difficulty used for mining
-        self.difficulty = difficulty;
-
-        let target = "0".repeat(difficulty);
+    pub fn mine(&mut self) {
+        let target = "0".repeat(self.difficulty);
 
         while !self.hash.starts_with(&target) {
             self.nonce += 1;
@@ -169,7 +171,7 @@ mod tests {
 
     #[test]
     fn test_genesis_block() {
-        let genesis = Block::genesis();
+        let genesis = Block::genesis(4);
 
         assert_eq!(genesis.index, 0);
         assert_eq!(genesis.previous_hash, "0".repeat(64));
@@ -194,13 +196,14 @@ mod tests {
                 50.0,
             )],
             "0".repeat(64),
+            2, // Set difficulty to 2
         );
 
-        // Check default difficulty is set
-        assert_eq!(block.difficulty, 4);
+        // Check difficulty is set correctly
+        assert_eq!(block.difficulty, 2);
 
-        // Override with test difficulty
-        block.mine(2);
+        // Mine the block
+        block.mine();
         assert!(block.hash.starts_with("00"));
         assert!(block.verify_proof_of_work(2));
 
@@ -213,15 +216,16 @@ mod tests {
                 50.0,
             )],
             block.hash.clone(),
+            4, // Set difficulty to 4
         );
-        block2.mine(4);
+        block2.mine();
         assert!(block2.hash.starts_with("0000"));
         assert!(block2.verify_proof_of_work(4));
     }
 
     #[test]
     fn test_block_validation() {
-        let genesis = Block::genesis();
+        let genesis = Block::genesis(2);
 
         // Create a valid next block
         let mut block = Block::new(
@@ -232,8 +236,9 @@ mod tests {
                 10.0,
             )],
             genesis.hash.clone(),
+            2,
         );
-        block.mine(2);
+        block.mine();
 
         // Should be valid
         assert!(block.is_valid());
@@ -279,6 +284,7 @@ mod tests {
                 50.0,
             )],
             "0".repeat(64),
+            4,
         );
 
         let hash1 = block.calculate_hash();
@@ -293,7 +299,7 @@ mod tests {
 
     #[test]
     fn test_future_timestamp_validation() {
-        let genesis = Block::genesis();
+        let genesis = Block::genesis(2);
 
         // Create a block with a timestamp too far in the future
         let mut invalid_block = Block::new(
@@ -304,6 +310,7 @@ mod tests {
                 10.0,
             )],
             genesis.hash.clone(),
+            2,
         );
 
         // Set timestamp to 3 hours in the future
