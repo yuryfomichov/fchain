@@ -31,5 +31,14 @@
         3000,
         8000
     ],
-    "postStartCommand": "echo 'export CARGO_HOME=$HOME/.cargo' >> ~/.zshrc && source ~/.zshrc"
+    "postStartCommand": "echo 'export CARGO_HOME=$HOME/.cargo' >> ~/.zshrc && source ~/.zshrc",
+    // SSH key forwarding configuration
+    "mounts": [
+        "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached"
+    ],
+    "runArgs": [
+        "--env",
+        "SSH_AUTH_SOCK=${localEnv:SSH_AUTH_SOCK}"
+    ],
+    "postCreateCommand": "chmod 700 ~/.ssh && chmod 600 ~/.ssh/* && chmod 644 ~/.ssh/*.pub"
 }
