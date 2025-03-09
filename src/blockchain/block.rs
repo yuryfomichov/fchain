@@ -74,7 +74,7 @@ impl Block {
     pub fn mine(&mut self, difficulty: usize) {
         let target = "0".repeat(difficulty);
 
-        while &self.hash[0..difficulty] != target {
+        while self.hash[0..difficulty] != target {
             self.nonce += 1;
             self.hash = self.calculate_hash();
         }

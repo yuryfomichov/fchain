@@ -1,4 +1,4 @@
-use fchain::blockchain::blockchain::Blockchain;
+use fchain::blockchain::chain::Blockchain;
 use fchain::blockchain::transaction::Transaction;
 
 #[test]

@@ -4,5 +4,5 @@ pub mod blockchain;
 
 // Re-export main types for convenience
 pub use blockchain::block::Block;
-pub use blockchain::blockchain::{Blockchain, BlockchainError, SharedBlockchain};
+pub use blockchain::chain::{Blockchain, BlockchainError, SharedBlockchain};
 pub use blockchain::transaction::Transaction;

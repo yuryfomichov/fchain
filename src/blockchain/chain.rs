@@ -32,8 +32,7 @@ pub struct Blockchain {
 impl Blockchain {
     /// Creates a new blockchain with the genesis block
     pub fn new(difficulty: usize, mining_reward: f64) -> Self {
-        let mut chain = Vec::new();
-        chain.push(Block::genesis());
+        let chain = vec![Block::genesis()];
 
         Self {
             chain,
