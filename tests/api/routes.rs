@@ -1,5 +1,3 @@
-use fchain::blockchain::wallet::Wallet;
-use fchain::blockchain::Transaction;
 use http::StatusCode;
 use serde_json::{json, Value};
 
@@ -32,12 +30,23 @@ async fn test_create_transaction() {
     // Arrange
     let server = create_test_server().await;
 
-    // Use a system transaction which doesn't require a signature
+    // First create a wallet to get a valid private key
+    let create_response = server.get("/wallet/create").await;
+    let wallet_data: Value = create_response.json();
+    let private_key = wallet_data["private_key"].as_str().unwrap();
+    let address = wallet_data["address"].as_str().unwrap();
+
+    // Mine a block to get some coins
+    let mine_data = json!({
+        "miner_address": address
+    });
+    server.post("/mine").json(&mine_data).await;
+
+    // Use the private key to create a transaction
     let tx_data = json!({
-        "sender": "system",
         "recipient": "recipient",
         "amount": 10.0,
-        "signature": null
+        "private_key": private_key
     });
 
     // Act
@@ -47,11 +56,10 @@ async fn test_create_transaction() {
     response.assert_status(StatusCode::OK);
 
     let body: Value = response.json();
-    assert_eq!(body["message"], "Transaction created successfully");
+    assert!(body["message"].as_str().unwrap().contains("successfully"));
 
     // Check the transaction fields
     let tx = &body["transaction"];
-    assert_eq!(tx["sender"], "system");
     assert_eq!(tx["recipient"], "recipient");
     assert_eq!(tx["amount"], 10.0);
 
@@ -59,31 +67,32 @@ async fn test_create_transaction() {
     let pending_response = server.get("/transactions/pending").await;
     let pending: Vec<Value> = pending_response.json();
     assert_eq!(pending.len(), 1);
-    assert_eq!(pending[0]["sender"], "system");
+    assert_eq!(pending[0]["recipient"], "recipient");
 }
 
 #[tokio::test]
 async fn test_create_signed_transaction() {
     // Arrange
     let server = create_test_server().await;
-    let wallet = Wallet::new().unwrap();
 
-    // Create a transaction with the exact same parameters as we'll send to the API
-    let mut tx = Transaction::new(
-        wallet.get_address().clone(),
-        wallet.get_address().clone(), // Send to self for testing
-        10.0,
-    );
+    // Create a wallet
+    let wallet_response = server.get("/wallet/create").await;
+    let wallet_data: Value = wallet_response.json();
+    let private_key = wallet_data["private_key"].as_str().unwrap();
+    let address = wallet_data["address"].as_str().unwrap();
+    let recipient = "test_recipient";
 
-    // Sign the transaction
-    tx.sign(&wallet).unwrap();
+    // Mine a block to get some coins
+    let mine_data = json!({
+        "miner_address": address
+    });
+    server.post("/mine").json(&mine_data).await;
 
-    // Create the API request with the SAME parameters
+    // Create the API request
     let tx_data = json!({
-        "sender": wallet.get_address().0,
-        "recipient": wallet.get_address().0, // Must match what we signed
+        "recipient": recipient,
         "amount": 10.0,
-        "signature": tx.signature.as_ref().map(|s| s.0.clone())
+        "private_key": private_key
     });
 
     // Act
@@ -93,12 +102,11 @@ async fn test_create_signed_transaction() {
     response.assert_status(StatusCode::OK);
 
     let body: Value = response.json();
-    assert_eq!(body["message"], "Transaction created successfully");
+    assert!(body["message"].as_str().unwrap().contains("successfully"));
 
     // Check the transaction fields
     let tx_response = &body["transaction"];
-    assert_eq!(tx_response["sender"], wallet.get_address().0);
-    assert_eq!(tx_response["recipient"], wallet.get_address().0);
+    assert_eq!(tx_response["recipient"], recipient);
     assert_eq!(tx_response["amount"], 10.0);
     assert!(tx_response["signature"].is_object() || tx_response["signature"].is_string());
 }
@@ -176,11 +184,17 @@ async fn test_get_pending_transactions_empty() {
 async fn test_invalid_transaction() {
     // Arrange
     let server = create_test_server().await;
+
+    // Create a wallet
+    let wallet_response = server.get("/wallet/create").await;
+    let wallet_data: Value = wallet_response.json();
+    let private_key = wallet_data["private_key"].as_str().unwrap();
+
+    // Create an invalid transaction (negative amount)
     let tx_data = json!({
-        "sender": "",  // Empty sender should be invalid
         "recipient": "test_recipient",
         "amount": -10.0,  // Negative amount should be invalid
-        "signature": null
+        "private_key": private_key
     });
 
     // Act
@@ -191,4 +205,104 @@ async fn test_invalid_transaction() {
 
     let body: Value = response.json();
     assert!(body["error"].as_str().unwrap().contains("not valid"));
+}
+
+#[tokio::test]
+async fn test_create_wallet() {
+    // Arrange
+    let server = create_test_server().await;
+
+    // Act
+    let response = server.get("/wallet/create").await;
+
+    // Assert
+    response.assert_status(StatusCode::OK);
+
+    let wallet_response: Value = response.json();
+
+    // Check that the wallet has the expected fields
+    assert!(wallet_response["address"].is_string());
+    assert!(wallet_response["public_key"].is_string());
+    assert!(wallet_response["private_key"].is_string());
+
+    // Verify the address is not empty
+    let address = wallet_response["address"].as_str().unwrap();
+    assert!(!address.is_empty());
+    assert_eq!(address.len(), 64); // Hex-encoded public key
+
+    // Verify the public key is not empty
+    let public_key = wallet_response["public_key"].as_str().unwrap();
+    assert!(!public_key.is_empty());
+    assert_eq!(public_key.len(), 64); // Hex-encoded public key
+
+    // Verify the private key is not empty
+    let private_key = wallet_response["private_key"].as_str().unwrap();
+    assert!(!private_key.is_empty());
+    assert_eq!(private_key.len(), 64); // Hex-encoded private key
+}
+
+#[tokio::test]
+async fn test_import_wallet() {
+    // Arrange
+    let server = create_test_server().await;
+
+    // First create a wallet to get a valid private key
+    let create_response = server.get("/wallet/create").await;
+    let create_data: Value = create_response.json();
+    let private_key = create_data["private_key"].as_str().unwrap();
+    let expected_address = create_data["address"].as_str().unwrap();
+    let expected_public_key = create_data["public_key"].as_str().unwrap();
+
+    // Act - Import the wallet
+    let import_data = json!({
+        "private_key": private_key
+    });
+    let response = server.post("/wallet/import").json(&import_data).await;
+
+    // Assert
+    response.assert_status(StatusCode::OK);
+
+    let import_response: Value = response.json();
+
+    // Check that the imported wallet has the expected fields
+    assert_eq!(import_response["address"], expected_address);
+    assert_eq!(import_response["public_key"], expected_public_key);
+    assert_eq!(import_response["message"], "Wallet imported successfully");
+}
+
+#[tokio::test]
+async fn test_validate_address() {
+    // Arrange
+    let server = create_test_server().await;
+
+    // First create a wallet to get a valid address
+    let create_response = server.get("/wallet/create").await;
+    let create_data: Value = create_response.json();
+    let valid_address = create_data["address"].as_str().unwrap();
+
+    // Act - Validate a valid address
+    let validate_data = json!({
+        "address": valid_address
+    });
+    let response = server.post("/wallet/validate").json(&validate_data).await;
+
+    // Assert
+    response.assert_status(StatusCode::OK);
+
+    let validate_response: Value = response.json();
+    assert_eq!(validate_response["is_valid"], true);
+    assert_eq!(validate_response["message"], "Address is valid");
+
+    // Act - Validate an invalid address
+    let invalid_data = json!({
+        "address": "invalid_address"
+    });
+    let response = server.post("/wallet/validate").json(&invalid_data).await;
+
+    // Assert
+    response.assert_status(StatusCode::OK);
+
+    let validate_response: Value = response.json();
+    assert_eq!(validate_response["is_valid"], false);
+    assert_eq!(validate_response["message"], "Address is not valid");
 }

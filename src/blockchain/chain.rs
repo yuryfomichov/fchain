@@ -149,6 +149,41 @@ impl Blockchain {
 
         Ok(true)
     }
+
+    /// Gets the balance of an address by examining all transactions in the blockchain
+    pub fn get_balance(&self, address: &str) -> f64 {
+        let mut balance = 0.0;
+
+        // Check all blocks in the chain
+        for block in &self.chain {
+            for transaction in &block.transactions {
+                // If this address is the recipient, add the amount
+                if transaction.recipient.0 == address {
+                    balance += transaction.amount;
+                }
+
+                // If this address is the sender, subtract the amount
+                if transaction.sender.0 == address {
+                    balance -= transaction.amount;
+                }
+            }
+        }
+
+        // Also check pending transactions
+        for transaction in &self.pending_transactions {
+            // If this address is the recipient, add the amount
+            if transaction.recipient.0 == address {
+                balance += transaction.amount;
+            }
+
+            // If this address is the sender, subtract the amount
+            if transaction.sender.0 == address {
+                balance -= transaction.amount;
+            }
+        }
+
+        balance
+    }
 }
 
 /// Thread-safe blockchain that can be shared between threads
@@ -183,7 +218,10 @@ mod tests {
         let wallet = Wallet::new().unwrap();
         let recipient = Address("recipient".to_string());
         let mut tx = Transaction::new(wallet.get_address().clone(), recipient, 10.0);
-        tx.sign(&wallet).unwrap();
+
+        // Sign the transaction using wallet directly
+        let signature = wallet.sign(tx.hash.as_bytes()).unwrap();
+        tx.signature = Some(signature);
 
         // Add transaction and mine block
         blockchain.create_transaction(tx).unwrap();
@@ -199,5 +237,53 @@ mod tests {
 
         // Validate the chain
         assert!(blockchain.is_chain_valid().unwrap());
+    }
+
+    #[test]
+    fn test_get_balance() {
+        let mut blockchain = Blockchain::new(2, 100.0);
+
+        // Create some test addresses
+        let address1 = "address1";
+        let address2 = "address2";
+
+        // Initially, balances should be zero
+        assert_eq!(blockchain.get_balance(address1), 0.0);
+        assert_eq!(blockchain.get_balance(address2), 0.0);
+
+        // Add a transaction from system to address1 (system transactions don't need signatures)
+        let tx1 = Transaction::new(
+            Address("system".to_string()),
+            Address(address1.to_string()),
+            100.0,
+        );
+        blockchain.create_transaction(tx1).unwrap();
+
+        // Mine the block to include the transaction
+        blockchain.mine_pending_transactions(address2).unwrap();
+
+        // Check balances after mining
+        assert_eq!(blockchain.get_balance(address1), 100.0);
+        assert_eq!(blockchain.get_balance(address2), 100.0); // Mining reward
+
+        // For non-system transactions, we need to create wallets and sign properly
+        // But for this test, we'll just use another system transaction
+        let tx2 = Transaction::new(
+            Address("system".to_string()),
+            Address(address2.to_string()),
+            50.0,
+        );
+        blockchain.create_transaction(tx2).unwrap();
+
+        // Check balances with pending transaction
+        assert_eq!(blockchain.get_balance(address1), 100.0);
+        assert_eq!(blockchain.get_balance(address2), 150.0); // 100 + 50
+
+        // Mine another block
+        blockchain.mine_pending_transactions(address1).unwrap();
+
+        // Check final balances
+        assert_eq!(blockchain.get_balance(address1), 200.0); // 100 + 100 (mining reward)
+        assert_eq!(blockchain.get_balance(address2), 150.0); // 150 (unchanged)
     }
 }

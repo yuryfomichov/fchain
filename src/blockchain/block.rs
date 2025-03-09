@@ -1,12 +1,12 @@
 use super::transaction::Transaction;
+use super::wallet::Address;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-
-use super::Address;
+use utoipa::ToSchema;
 
 /// Represents a block in the blockchain
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Block {
     /// Index of the block in the chain
     pub index: u64,
@@ -103,7 +103,6 @@ impl Block {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::blockchain::Address;
 
     #[test]
     fn test_genesis_block() {
@@ -117,12 +116,11 @@ mod tests {
 
     #[test]
     fn test_mining() {
-        let recipient = Address("recipient".to_string());
         let mut block = Block::new(
             1,
             vec![Transaction::new(
                 Address("system".to_string()),
-                recipient,
+                Address("recipient".to_string()),
                 50.0,
             )],
             "previous_hash".to_string(),

@@ -6,25 +6,17 @@ use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use thiserror::Error;
+use utoipa::ToSchema;
 
 /// Errors that can occur when working with wallets
 #[derive(Debug, Error)]
 pub enum WalletError {
-    #[error("Failed to generate keypair: {0}")]
-    KeypairGenerationError(String),
-
-    #[error("Failed to sign message: {0}")]
-    SigningError(String),
-
-    #[error("Failed to verify signature: {0}")]
-    VerificationError(String),
-
     #[error("Invalid key format: {0}")]
     InvalidKeyFormat(String),
 }
 
 /// Represents a blockchain address
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct Address(pub String);
 
 impl fmt::Display for Address {
@@ -48,7 +40,7 @@ impl Address {
 }
 
 /// Represents a digital signature for a transaction
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct TransactionSignature(pub String);
 
 impl TransactionSignature {

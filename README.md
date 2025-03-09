@@ -57,15 +57,21 @@ You can see the status of the CI pipeline in the GitHub repository under the "Ac
 
 The application exposes two ports:
 - **Port 3000**: The blockchain API server
-- **Port 8000**: Documentation server (when running)
+- **Port 8000**: Documentation server
 
-### API Access
-When the application is running, you can access the API at:
-- From inside the container: http://localhost:3000
-- From your host machine: http://localhost:3000
+### API Documentation
+The API is documented using OpenAPI (Swagger) specification. You can access the interactive API documentation in two ways:
+
+1. **Swagger UI** (when the application is running):
+   - Visit http://localhost:3000/swagger-ui/ in your browser
+   - This provides an interactive interface to explore and test the API endpoints
+
+2. **Raw OpenAPI Specification**:
+   - Visit http://localhost:3000/api-docs/openapi.json
+   - This provides the raw OpenAPI specification in JSON format
 
 ### Documentation Access
-To view the documentation:
+To view the Rust API documentation:
 
 1. Generate and serve the documentation:
 ```bash
@@ -80,13 +86,6 @@ cd target/doc && python3 -m http.server 8000 --bind 0.0.0.0
 2. Access the documentation in your browser:
 - From your host machine: http://localhost:8000
 - Navigate to the `fchain` crate documentation
-
-## API Endpoints
-
-- `GET /blocks` - Get all blocks in the chain
-- `POST /transactions` - Create a new transaction
-- `POST /mine` - Mine a new block with pending transactions
-- `GET /chain/validate` - Validate the integrity of the blockchain
 
 ## License
 

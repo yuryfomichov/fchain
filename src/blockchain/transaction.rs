@@ -1,11 +1,12 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use utoipa::ToSchema;
 
-use super::wallet::{Address, TransactionSignature, Wallet, WalletError};
+use super::wallet::{Address, TransactionSignature, Wallet};
 
 /// Represents a transaction in the blockchain
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Transaction {
     /// Sender's address
     pub sender: Address,
@@ -38,21 +39,6 @@ impl Transaction {
         transaction
     }
 
-    /// Signs the transaction with a wallet
-    pub fn sign(&mut self, wallet: &Wallet) -> Result<(), WalletError> {
-        // Verify that the signer is the sender
-        if wallet.get_address() != &self.sender {
-            return Err(WalletError::SigningError(
-                "Wallet address does not match sender".to_string(),
-            ));
-        }
-
-        // Sign the transaction hash
-        let signature = wallet.sign(self.hash.as_bytes())?;
-        self.signature = Some(signature);
-        Ok(())
-    }
-
     /// Calculates the hash of the transaction
     pub fn calculate_hash(&self) -> String {
         let mut hasher = Sha256::new();
@@ -73,16 +59,23 @@ impl Transaction {
     pub fn is_valid(&self) -> bool {
         // Check if the amount is valid
         if self.amount <= 0.0 {
+            println!("Transaction invalid: amount <= 0");
             return false;
         }
 
         // Check if the addresses are valid
         if self.sender.0.is_empty() || self.recipient.0.is_empty() {
+            println!("Transaction invalid: empty sender or recipient");
             return false;
         }
 
         // Check if the hash is correct
-        if self.calculate_hash() != self.hash {
+        let calculated_hash = self.calculate_hash();
+        if calculated_hash != self.hash {
+            println!(
+                "Transaction invalid: hash mismatch. Expected: {}, Got: {}",
+                self.hash, calculated_hash
+            );
             return false;
         }
 
@@ -94,11 +87,26 @@ impl Transaction {
         // Check if the transaction is signed
         let signature = match &self.signature {
             Some(sig) => sig,
-            None => return false,
+            None => {
+                println!("Transaction invalid: missing signature");
+                return false;
+            }
         };
 
         // Verify the signature
-        Wallet::verify(&self.sender.0, self.hash.as_bytes(), signature).unwrap_or(false)
+        let result = Wallet::verify(&self.sender.0, self.hash.as_bytes(), signature);
+        match result {
+            Ok(valid) => {
+                if !valid {
+                    println!("Transaction invalid: signature verification failed");
+                }
+                valid
+            }
+            Err(e) => {
+                println!("Transaction invalid: signature verification error: {}", e);
+                false
+            }
+        }
     }
 }
 
@@ -125,13 +133,16 @@ mod tests {
         let recipient = Address("recipient".to_string());
         let mut tx = Transaction::new(wallet.get_address().clone(), recipient, 10.0);
 
-        // Sign the transaction
-        tx.sign(&wallet).unwrap();
+        // Sign the transaction using wallet directly
+        let signature = wallet.sign(tx.hash.as_bytes()).unwrap();
+        tx.signature = Some(signature);
         assert!(tx.is_valid());
 
-        // Try to sign with wrong wallet
+        // Try to sign with wrong wallet (should still work but validation will fail)
         let wrong_wallet = Wallet::new().unwrap();
-        assert!(tx.sign(&wrong_wallet).is_err());
+        let wrong_signature = wrong_wallet.sign(tx.hash.as_bytes()).unwrap();
+        tx.signature = Some(wrong_signature);
+        assert!(!tx.is_valid());
     }
 
     #[test]
@@ -150,8 +161,9 @@ mod tests {
         let recipient = Address("recipient".to_string());
         let mut tx = Transaction::new(wallet.get_address().clone(), recipient, 10.0);
 
-        // Sign the transaction
-        tx.sign(&wallet).unwrap();
+        // Sign the transaction using wallet directly
+        let signature = wallet.sign(tx.hash.as_bytes()).unwrap();
+        tx.signature = Some(signature);
         assert!(tx.is_valid());
 
         // Tamper with the amount
