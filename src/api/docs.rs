@@ -4,7 +4,7 @@ use crate::api::handlers::{
     CreateTransactionRequest, CreateTransactionResponse, MineBlockRequest, MineBlockResponse,
     ValidateChainResponse,
 };
-use crate::blockchain::wallet::{Address, PublicKeyHex, TransactionSignature};
+use crate::blockchain::crypto::{Address, PublicKeyHex, TransactionSignature};
 use crate::blockchain::{Block, Transaction};
 
 #[derive(OpenApi)]

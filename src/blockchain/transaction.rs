@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use utoipa::ToSchema;
 
-use super::wallet::{
+use super::crypto::{
     verify_address, verify_signature, Address, PublicKeyHex, TransactionSignature,
 };
 

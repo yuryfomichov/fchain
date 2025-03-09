@@ -80,7 +80,7 @@ fn test_validate_chain() {
 #[test]
 fn test_transaction_flow() {
     use fchain::blockchain::create_shared_blockchain;
-    use fchain::blockchain::wallet::TransactionSignature;
+    use fchain::blockchain::crypto::TransactionSignature;
     use fchain::blockchain::{Address, Transaction};
 
     // Create a blockchain

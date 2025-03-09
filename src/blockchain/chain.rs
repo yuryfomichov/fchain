@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
-use super::{block::Block, transaction::Transaction, wallet::Address};
+use super::{block::Block, crypto::Address, transaction::Transaction};
 
 /// Errors that can occur in the blockchain
 #[derive(Debug, Error)]
@@ -197,7 +197,7 @@ pub fn create_shared_blockchain(difficulty: usize, mining_reward: f64) -> Shared
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::blockchain::wallet::Address;
+    use crate::blockchain::crypto::Address;
 
     #[test]
     fn test_blockchain_creation() {

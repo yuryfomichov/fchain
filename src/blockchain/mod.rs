@@ -1,9 +1,9 @@
 pub mod block;
 pub mod chain;
+pub mod crypto;
 pub mod transaction;
-pub mod wallet;
 
 pub use block::Block;
 pub use chain::{create_shared_blockchain, BlockchainError, SharedBlockchain};
+pub use crypto::Address;
 pub use transaction::Transaction;
-pub use wallet::Address;

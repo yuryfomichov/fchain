@@ -2,7 +2,7 @@ use axum::{extract::State, Json};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::blockchain::wallet::{PublicKeyHex, TransactionSignature};
+use crate::blockchain::crypto::{PublicKeyHex, TransactionSignature};
 use crate::blockchain::{Address, BlockchainError, SharedBlockchain, Transaction};
 
 /// Request to create a new transaction
