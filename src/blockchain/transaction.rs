@@ -3,20 +3,13 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use utoipa::ToSchema;
 
-use super::wallet::{verify_signature, Address, TransactionSignature};
+use super::wallet::{
+    verify_address, verify_signature, Address, PublicKeyHex, TransactionSignature,
+};
 
-/// Represents a transaction in the blockchain
-///
-/// NOTE: In a production environment, transactions would be:
-/// 1. Created and signed by a separate wallet application
-/// 2. Submitted to the blockchain as already-signed transactions
-/// 3. The blockchain would only verify signatures, not create them
-///
-/// The current implementation allows direct signing for simplicity,
-/// but this represents a security concern in real-world applications.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Transaction {
-    /// Sender's address
+    /// Sender's address (hash of public key)
     pub sender: Address,
     /// Recipient's address
     pub recipient: Address,
@@ -28,6 +21,8 @@ pub struct Transaction {
     pub hash: String,
     /// Digital signature of the transaction
     pub signature: Option<TransactionSignature>,
+    /// Full public key of the sender (required when spending)
+    pub public_key: Option<PublicKeyHex>,
 }
 
 impl Transaction {
@@ -41,6 +36,7 @@ impl Transaction {
             timestamp,
             hash: String::new(),
             signature: None,
+            public_key: None,
         };
 
         transaction.hash = transaction.calculate_hash();
@@ -87,7 +83,7 @@ impl Transaction {
             return false;
         }
 
-        // System transactions (mining rewards) don't need signatures
+        // System transactions (mining rewards) don't need signatures or public keys
         if self.sender.0 == "system" {
             return true;
         }
@@ -101,8 +97,31 @@ impl Transaction {
             }
         };
 
+        // Check if the public key is provided
+        let public_key = match &self.public_key {
+            Some(pk) => pk,
+            None => {
+                println!("Transaction invalid: missing public key");
+                return false;
+            }
+        };
+
+        // Verify that the address was derived from the public key
+        let address_valid = match verify_address(public_key, &self.sender) {
+            Ok(valid) => valid,
+            Err(e) => {
+                println!("Transaction invalid: address verification error: {}", e);
+                return false;
+            }
+        };
+
+        if !address_valid {
+            println!("Transaction invalid: address not derived from provided public key");
+            return false;
+        }
+
         // Verify the signature
-        let result = verify_signature(&self.sender.0, self.hash.as_bytes(), signature);
+        let result = verify_signature(public_key, self.hash.as_bytes(), signature);
         match result {
             Ok(valid) => {
                 if !valid {
