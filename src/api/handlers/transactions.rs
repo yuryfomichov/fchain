@@ -1,4 +1,5 @@
 use axum::{extract::State, Json};
+use log::{error, info};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -41,8 +42,16 @@ pub struct CreateTransactionResponse {
 pub async fn get_pending_transactions(
     State(blockchain): State<SharedBlockchain>,
 ) -> Json<Vec<Transaction>> {
+    info!("GET /transactions/pending - Retrieving pending transactions");
+
     let blockchain = blockchain.lock().unwrap();
-    Json(blockchain.pending_transactions.clone())
+    let transactions = blockchain.pending_transactions.clone();
+
+    info!(
+        "GET /transactions/pending - Returning {} pending transactions with status 200",
+        transactions.len()
+    );
+    Json(transactions)
 }
 
 /// Creates a transaction
@@ -60,26 +69,38 @@ pub async fn create_transaction(
     State(blockchain): State<SharedBlockchain>,
     Json(request): Json<CreateTransactionRequest>,
 ) -> Result<Json<CreateTransactionResponse>, BlockchainError> {
+    info!(
+        "POST /transactions - Creating transaction from {} to {} for amount {}",
+        request.sender, request.recipient, request.amount
+    );
+
     // Create transaction with the provided data
     let sender = Address(request.sender.clone());
-    let recipient = Address(request.recipient);
+    let recipient = Address(request.recipient.clone());
 
     // Create the transaction
     let mut transaction = Transaction::new(sender, recipient, request.amount);
 
     // Special handling for system transactions
     if request.sender == "system" {
+        info!("POST /transactions - Processing system transaction");
         // System transactions don't need signature validation or balance checks
         transaction.signature = Some(TransactionSignature("system".to_string()));
     } else {
+        info!(
+            "POST /transactions - Processing regular transaction, validating signature and balance"
+        );
         // For regular transactions, we need both signature and public key
         let signature = request.signature;
 
-        let public_key = request.public_key.ok_or_else(|| {
-            BlockchainError::InvalidTransaction(
-                "Non-system transactions require a public key".to_string(),
-            )
-        })?;
+        let public_key = match request.public_key {
+            Some(pk) => pk,
+            None => {
+                let err_msg = "Non-system transactions require a public key";
+                error!("POST /transactions - Validation failed: {}", err_msg);
+                return Err(BlockchainError::InvalidTransaction(err_msg.to_string()));
+            }
+        };
 
         // Add the signature and public key from the external wallet
         transaction.signature = Some(TransactionSignature(signature));
@@ -87,19 +108,21 @@ pub async fn create_transaction(
 
         // Validate the transaction
         if !transaction.is_valid() {
-            return Err(BlockchainError::InvalidTransaction(
-                "Transaction validation failed".to_string(),
-            ));
+            let err_msg = "Transaction validation failed";
+            error!("POST /transactions - Validation failed: {}", err_msg);
+            return Err(BlockchainError::InvalidTransaction(err_msg.to_string()));
         }
 
         // Check if sender has sufficient balance
         let chain = blockchain.lock().unwrap();
         let balance = chain.get_balance(&request.sender);
         if balance < request.amount {
-            return Err(BlockchainError::InvalidTransaction(format!(
+            let err_msg = format!(
                 "Insufficient balance: {} has only {} coins",
                 request.sender, balance
-            )));
+            );
+            error!("POST /transactions - {}", err_msg);
+            return Err(BlockchainError::InvalidTransaction(err_msg));
         }
         // Release the lock before proceeding
         drop(chain);
@@ -107,10 +130,17 @@ pub async fn create_transaction(
 
     // Add the transaction to the blockchain
     let mut chain = blockchain.lock().unwrap();
-    chain.create_transaction(transaction.clone())?;
-
-    Ok(Json(CreateTransactionResponse {
-        message: "Transaction created successfully".to_string(),
-        transaction,
-    }))
+    match chain.create_transaction(transaction.clone()) {
+        Ok(_) => {
+            info!("POST /transactions - Transaction created successfully with status 200");
+            Ok(Json(CreateTransactionResponse {
+                message: "Transaction created successfully".to_string(),
+                transaction,
+            }))
+        }
+        Err(err) => {
+            error!("POST /transactions - Failed to create transaction: {}", err);
+            Err(err)
+        }
+    }
 }

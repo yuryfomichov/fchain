@@ -3,6 +3,7 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
+use log::error;
 use serde::Serialize;
 use utoipa::ToSchema;
 
@@ -18,8 +19,16 @@ pub struct ErrorResponse {
 impl IntoResponse for BlockchainError {
     fn into_response(self) -> Response {
         let status = StatusCode::BAD_REQUEST;
+        let error_message = self.to_string();
+
+        error!(
+            "Error response with status {}: {}",
+            status.as_u16(),
+            error_message
+        );
+
         let body = Json(ErrorResponse {
-            error: self.to_string(),
+            error: error_message,
         });
         (status, body).into_response()
     }

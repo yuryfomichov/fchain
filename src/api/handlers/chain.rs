@@ -1,4 +1,5 @@
 use axum::{extract::State, Json};
+use log::{error, info};
 use serde::Serialize;
 use utoipa::ToSchema;
 
@@ -26,11 +27,23 @@ pub struct ValidateChainResponse {
 pub async fn validate_chain(
     State(blockchain): State<SharedBlockchain>,
 ) -> Result<Json<ValidateChainResponse>, BlockchainError> {
-    let blockchain = blockchain.lock().unwrap();
-    blockchain.is_chain_valid()?;
+    info!("GET /chain/validate - Validating blockchain");
 
-    Ok(Json(ValidateChainResponse {
-        valid: true,
-        message: "Blockchain is valid".to_string(),
-    }))
+    let blockchain = blockchain.lock().unwrap();
+    match blockchain.is_chain_valid() {
+        Ok(_) => {
+            info!("GET /chain/validate - Blockchain is valid, returning status 200");
+            Ok(Json(ValidateChainResponse {
+                valid: true,
+                message: "Blockchain is valid".to_string(),
+            }))
+        }
+        Err(err) => {
+            error!(
+                "GET /chain/validate - Blockchain validation failed: {}",
+                err
+            );
+            Err(err)
+        }
+    }
 }
