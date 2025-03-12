@@ -19,7 +19,7 @@ async fn main() {
     let app = api::create_router(blockchain);
 
     // Define the address to run the server on
-    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3013));
 
     info!("Starting blockchain server on {}", addr);
 

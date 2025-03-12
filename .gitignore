@@ -22,3 +22,4 @@
 
 # macOS specific files
 .DS_Store
+app.log

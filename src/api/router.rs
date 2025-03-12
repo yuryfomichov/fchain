@@ -2,6 +2,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use tower_http::cors::{Any, CorsLayer};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
@@ -11,6 +12,12 @@ use crate::blockchain::SharedBlockchain;
 
 /// Creates the API router
 pub fn create_router(blockchain: SharedBlockchain) -> Router {
+    // Configure CORS middleware
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any);
+
     Router::new()
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .route("/blocks", get(handlers::get_blocks))
@@ -22,4 +29,5 @@ pub fn create_router(blockchain: SharedBlockchain) -> Router {
         )
         .route("/chain/validate", get(handlers::validate_chain))
         .with_state(blockchain)
+        .layer(cors)
 }
